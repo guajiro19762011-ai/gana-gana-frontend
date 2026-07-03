@@ -31,6 +31,7 @@ export default function AdminPanel() {
   const [nuevoAnuncio, setNuevoAnuncio] = useState({ titulo: '', contenido: '' })
   const [saldoAcumulado, setSaldoAcumulado] = useState(0)
   const [sorteoDetalle, setSorteoDetalle] = useState(null)
+  const [solicitudesRevendedor, setSolicitudesRevendedor] = useState([])
 
   useEffect(() => { cargarDatos() }, [tab])
 
@@ -38,13 +39,14 @@ export default function AdminPanel() {
 
   const cargarDatos = async () => {
     try {
-      const [statsRes, recargasRes, usuariosRes, retirosRes, anunciosRes, historialRes] = await Promise.all([
+      const [statsRes, recargasRes, usuariosRes, retirosRes, anunciosRes, historialRes, revendedoresRes] = await Promise.all([
         axios.get(`${API}/admin/stats`, { headers: h() }),
         axios.get(`${API}/admin/recargas`, { headers: h() }),
         axios.get(`${API}/admin/usuarios`, { headers: h() }),
         axios.get(`${API}/retiros/pendientes`, { headers: h() }),
         axios.get(`${API}/anuncios/todos`, { headers: h() }),
         axios.get(`${API}/admin/sorteos/historial`, { headers: h() }),
+        axios.get(`${API}/admin/revendedores/solicitudes`, { headers: h() }),
       ])
       setStats(statsRes.data)
       setSorteoActivo(statsRes.data.sorteo)
@@ -53,6 +55,7 @@ export default function AdminPanel() {
       setRetiros(retirosRes.data)
       setAnuncios(anunciosRes.data)
       setHistorialSorteos(historialRes.data)
+      setSolicitudesRevendedor(revendedoresRes.data)
       const total = historialRes.data.filter(s => s.estado === 'jugado').reduce((acc, s) => acc + (s.saldo_acumulado || 0), 0)
       setSaldoAcumulado(total)
     } catch (err) { console.error('Error cargando datos:', err) }
@@ -90,7 +93,7 @@ export default function AdminPanel() {
   }
 
   const eliminarUsuario = async (id) => {
-    if (!confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Eliminar este usuario?')) return
     try {
       await axios.delete(`${API}/admin/usuarios/${id}`, { headers: h() })
       cargarDatos(); setModalUsuario(null); alert('✅ Usuario eliminado')
@@ -101,7 +104,7 @@ export default function AdminPanel() {
     if (!recargarMonto || Number(recargarMonto) <= 0) return alert('Monto inválido')
     try {
       await axios.post(`${API}/admin/usuarios/${modalUsuario.id}/recargar`, { monto: Number(recargarMonto), descripcion: recargarDesc || 'Recarga manual por administrador' }, { headers: h() })
-      cargarDatos(); setModalUsuario(null); alert(`✅ Saldo recargado`)
+      cargarDatos(); setModalUsuario(null); alert('✅ Saldo recargado')
     } catch (err) { alert('Error al recargar') }
   }
 
@@ -121,8 +124,24 @@ export default function AdminPanel() {
   }
 
   const rechazarRetiro = async (id) => {
-    try { await axios.post(`${API}/retiros/${id}/rechazar`, {}, { headers: h() }); cargarDatos(); alert('✅ Retiro rechazado — saldo devuelto') }
+    try { await axios.post(`${API}/retiros/${id}/rechazar`, {}, { headers: h() }); cargarDatos(); alert('✅ Retiro rechazado') }
     catch (err) { alert('Error al rechazar retiro') }
+  }
+
+  const aprobarRevendedor = async (id, nombre) => {
+    try {
+      await axios.post(`${API}/admin/revendedores/${id}/aprobar`, {}, { headers: h() })
+      cargarDatos()
+      alert(`✅ ${nombre} ahora es revendedor`)
+    } catch (err) { alert('Error al aprobar') }
+  }
+
+  const rechazarRevendedor = async (id) => {
+    try {
+      await axios.post(`${API}/admin/revendedores/${id}/rechazar`, {}, { headers: h() })
+      cargarDatos()
+      alert('✅ Solicitud rechazada')
+    } catch (err) { alert('Error al rechazar') }
   }
 
   const calcularGanadores = async () => {
@@ -138,7 +157,7 @@ export default function AdminPanel() {
   const pagarPremio = async (g, idx) => {
     if (!confirm(`¿Pagar $${g.premio.toLocaleString('es-CO')} a ${g.nombre}?`)) return
     try {
-      await axios.post(`${API}/admin/sorteo/pagar-premio`, { usuario_id: g.usuario_id, premio: g.premio, categoria: g.categoria, numero: g.numero }, { headers: h() })
+      await axios.post(`${API}/admin/sorteo/pagar-premio`, { usuario_id: g.usuario_id, premio: g.premio, categoria: g.categoria, numero: g.numero, celular: g.celular }, { headers: h() })
       setPremiosPagados(prev => ({ ...prev, [idx]: true }))
       cargarDatos()
     } catch (err) { alert('Error al pagar premio') }
@@ -146,14 +165,14 @@ export default function AdminPanel() {
 
   const cerrarSorteo = async () => {
     if (!winner || winner.length !== 4) return alert('Primero ingresa el número ganador de 4 dígitos')
-    if (!confirm(`¿Cerrar el sorteo actual con número ganador ${winner} e iniciar uno nuevo? Esta acción no se puede deshacer.`)) return
+    if (!confirm(`¿Cerrar el sorteo con número ganador ${winner} e iniciar uno nuevo?`)) return
     setCerrando(true)
     try {
       const { data } = await axios.post(`${API}/admin/sorteo/cerrar`, { numero_ganador: winner }, { headers: h() })
-      alert(`✅ Sorteo cerrado exitosamente.\nUtilidad: $${data.utilidad.toLocaleString('es-CO')}\nSaldo acumulado total: $${data.saldo_total.toLocaleString('es-CO')}\n\n¡El nuevo sorteo ha iniciado!`)
+      alert(`✅ Sorteo cerrado.\nUtilidad: $${data.utilidad.toLocaleString('es-CO')}\nSaldo acumulado: $${data.saldo_total.toLocaleString('es-CO')}\n\n¡Nuevo sorteo iniciado!`)
       setWinner(''); setGanadores([]); setPremiosPagados({})
       cargarDatos()
-    } catch (err) { alert('Error al cerrar sorteo: ' + (err.response?.data?.error || err.message)) }
+    } catch (err) { alert('Error: ' + (err.response?.data?.error || err.message)) }
     finally { setCerrando(false) }
   }
 
@@ -162,18 +181,18 @@ export default function AdminPanel() {
     try {
       await axios.post(`${API}/anuncios`, nuevoAnuncio, { headers: h() })
       setNuevoAnuncio({ titulo: '', contenido: '' }); cargarDatos(); alert('✅ Anuncio publicado')
-    } catch (err) { alert('Error al publicar anuncio') }
+    } catch (err) { alert('Error al publicar') }
   }
 
   const toggleAnuncio = async (id, activo) => {
     try { await axios.put(`${API}/anuncios/${id}`, { activo: !activo }, { headers: h() }); cargarDatos() }
-    catch (err) { alert('Error al actualizar anuncio') }
+    catch (err) { alert('Error') }
   }
 
   const eliminarAnuncio = async (id) => {
     if (!confirm('¿Eliminar este anuncio?')) return
     try { await axios.delete(`${API}/anuncios/${id}`, { headers: h() }); cargarDatos() }
-    catch (err) { alert('Error al eliminar anuncio') }
+    catch (err) { alert('Error') }
   }
 
   const recaudoActivo = sorteoActivo ? (sorteoActivo.total_boletas * 5000) : 0
@@ -198,6 +217,7 @@ export default function AdminPanel() {
           { id: 'dashboard', label: '📊 Dashboard' },
           { id: 'sorteo', label: '🎯 Sorteo' },
           { id: 'recargas', label: '💰 Pagos' },
+          { id: 'revendedores', label: `🤝 Revendedores ${solicitudesRevendedor.length > 0 ? `(${solicitudesRevendedor.length})` : ''}` },
           { id: 'usuarios', label: '👥 Usuarios' },
           { id: 'anuncios', label: '📢 Anuncios' },
           { id: 'historial', label: '📋 Historial' },
@@ -213,27 +233,28 @@ export default function AdminPanel() {
         <div>
           <div style={s.kpiGrid}>
             <div style={s.kpi}><div style={{ ...s.kpiVal, color: '#D4AF37' }}>{stats.usuarios}</div><div style={s.kpiLabel}>Usuarios</div></div>
-            <div style={s.kpi}><div style={{ ...s.kpiVal, color: '#4ade80' }}>${recaudoActivo.toLocaleString('es-CO')}</div><div style={s.kpiLabel}>Recaudo sorteo actual</div></div>
+            <div style={s.kpi}><div style={{ ...s.kpiVal, color: '#4ade80' }}>${recaudoActivo.toLocaleString('es-CO')}</div><div style={s.kpiLabel}>Recaudo actual</div></div>
             <div style={s.kpi}><div style={{ ...s.kpiVal, color: '#f87171' }}>${premiosPagadosActivo.toLocaleString('es-CO')}</div><div style={s.kpiLabel}>Premios pagados</div></div>
             <div style={s.kpi}><div style={{ ...s.kpiVal, color: '#D4AF37' }}>${utilidadActivo.toLocaleString('es-CO')}</div><div style={s.kpiLabel}>Utilidad actual</div></div>
           </div>
           <div style={s.card}>
             <div style={s.cardTitle}>💰 Contabilidad acumulada</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div style={s.kpi}><div style={{ ...s.kpiVal, color: '#4ade80', fontSize: '18px' }}>${saldoAcumulado.toLocaleString('es-CO')}</div><div style={s.kpiLabel}>Saldo total acumulado (sorteos cerrados)</div></div>
+              <div style={s.kpi}><div style={{ ...s.kpiVal, color: '#4ade80', fontSize: '18px' }}>${saldoAcumulado.toLocaleString('es-CO')}</div><div style={s.kpiLabel}>Saldo total acumulado</div></div>
               <div style={s.kpi}><div style={{ ...s.kpiVal, fontSize: '18px' }}>{historialSorteos.filter(s => s.estado === 'jugado').length}</div><div style={s.kpiLabel}>Sorteos realizados</div></div>
             </div>
           </div>
           <div style={s.card}>
             <div style={s.cardTitle}>📈 Progreso sorteo #{String(sorteoActivo?.id || 1).padStart(4,'0')}</div>
             <div style={s.progressBar}><div style={{ ...s.progressFill, width: `${Math.min(((sorteoActivo?.total_boletas || 0) / 1000) * 100, 100)}%` }} /></div>
-            <div style={s.progressText}>{sorteoActivo?.total_boletas || 0} / 1.000 boletas — {(((sorteoActivo?.total_boletas || 0) / 1000) * 100).toFixed(1)}% vendido</div>
+            <div style={s.progressText}>{sorteoActivo?.total_boletas || 0} / 1.000 boletas</div>
           </div>
           <div style={s.card}>
             <div style={s.cardTitle}>⚠️ Pendientes</div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button style={s.btn} onClick={() => setTab('recargas')}>💳 Recargas ({stats.recargas_pendientes})</button>
               <button style={s.btn} onClick={() => setTab('recargas')}>💸 Retiros ({stats.retiros_pendientes})</button>
+              <button style={{ ...s.btn, background: '#9333ea' }} onClick={() => setTab('revendedores')}>🤝 Revendedores ({solicitudesRevendedor.length})</button>
               <button style={s.btnSecondary} onClick={cargarDatos}>🔄 Actualizar</button>
             </div>
           </div>
@@ -246,17 +267,11 @@ export default function AdminPanel() {
           <div style={s.card}>
             <div style={s.cardTitle}>🎯 Número ganador — Sorteo #{String(sorteoActivo?.id || 1).padStart(4,'0')}</div>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <input
-                style={{ ...s.input, fontSize: '28px', letterSpacing: '8px', textAlign: 'center', maxWidth: '160px' }}
-                value={winner}
-                onChange={e => setWinner(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
-                placeholder="0000" maxLength={4}
-              />
+              <input style={{ ...s.input, fontSize: '28px', letterSpacing: '8px', textAlign: 'center', maxWidth: '160px' }} value={winner} onChange={e => setWinner(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))} placeholder="0000" maxLength={4} />
               <button style={{ ...s.btn, opacity: cargando ? 0.7 : 1 }} onClick={calcularGanadores} disabled={cargando}>
                 {cargando ? 'Calculando...' : '🔍 Calcular ganadores'}
               </button>
             </div>
-
             {ganadores.length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '13px', color: '#888', marginBottom: '10px' }}>{ganadores.length} ganador(es):</div>
@@ -279,12 +294,9 @@ export default function AdminPanel() {
                 ))}
               </div>
             )}
-
             <div style={{ background: '#111', borderRadius: '10px', padding: '14px', border: '1px solid #D4AF3730' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#D4AF37', marginBottom: '8px' }}>⚠️ Cerrar sorteo e iniciar nuevo</div>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '12px' }}>
-                Esto cerrará el sorteo actual, guardará la utilidad al saldo acumulado y creará un nuevo sorteo con todos los números disponibles.
-              </div>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '12px' }}>Cierra el sorteo actual y crea uno nuevo con todos los números disponibles.</div>
               <button style={{ ...s.btnDanger, opacity: cerrando ? 0.7 : 1, width: '100%' }} onClick={cerrarSorteo} disabled={cerrando}>
                 {cerrando ? 'Cerrando...' : '🔄 Cerrar sorteo e iniciar nuevo'}
               </button>
@@ -293,7 +305,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* PAGOS (recargas + retiros) */}
+      {/* PAGOS */}
       {tab === 'recargas' && (
         <div>
           <div style={s.card}>
@@ -316,7 +328,6 @@ export default function AdminPanel() {
                 </div>
               ))}
           </div>
-
           <div style={s.card}>
             <div style={{ ...s.cardTitle, display: 'flex', justifyContent: 'space-between' }}>
               <span>💸 Retiros pendientes ({retiros.length})</span>
@@ -339,6 +350,54 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* REVENDEDORES */}
+      {tab === 'revendedores' && (
+        <div>
+          <div style={s.card}>
+            <div style={{ ...s.cardTitle, display: 'flex', justifyContent: 'space-between' }}>
+              <span>🤝 Solicitudes de revendedor ({solicitudesRevendedor.length})</span>
+              <button style={s.btnSecondary} onClick={cargarDatos}>🔄</button>
+            </div>
+            {solicitudesRevendedor.length === 0 ? (
+              <div style={s.empty}>✅ No hay solicitudes pendientes</div>
+            ) : solicitudesRevendedor.map(u => (
+              <div key={u.id} style={s.recargaRow}>
+                <div>
+                  <div style={s.recargaNombre}>{u.nombre}</div>
+                  <div style={s.recargaMeta}>{u.email} · {u.celular} · {u.codigo_referido}</div>
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '3px' }}>
+                    Saldo: <strong style={{ color: '#4ade80' }}>${(u.saldo || 0).toLocaleString('es-CO')}</strong> · Registro: {new Date(u.created_at).toLocaleDateString('es-CO')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button style={s.btn} onClick={() => aprobarRevendedor(u.id, u.nombre)}>✅ Aprobar</button>
+                  <button style={s.btnDanger} onClick={() => rechazarRevendedor(u.id)}>❌ Rechazar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={s.card}>
+            <div style={s.cardTitle}>👥 Revendedores activos</div>
+            {usuarios.filter(u => u.rol === 'revendedor').length === 0 ? (
+              <div style={s.empty}>No hay revendedores activos aún</div>
+            ) : usuarios.filter(u => u.rol === 'revendedor').map(u => (
+              <div key={u.id} style={s.usuarioRow}>
+                <div style={{ ...s.avatar, background: '#4a0080' }}>🤝</div>
+                <div style={{ flex: 1 }}>
+                  <div style={s.usuarioNombre}>{u.nombre}</div>
+                  <div style={s.usuarioMeta}>{u.codigo_referido} · {u.email} · {u.celular}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#4ade80' }}>${(u.saldo || 0).toLocaleString('es-CO')}</div>
+                  <div style={{ fontSize: '11px', color: '#e879f9', marginTop: '2px' }}>Revendedor</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* USUARIOS */}
       {tab === 'usuarios' && (
         <div style={s.card}>
@@ -348,9 +407,15 @@ export default function AdminPanel() {
           </div>
           {usuarios.map(u => (
             <div key={u.id} style={s.usuarioRow}>
-              <div style={s.avatar}>{u.nombre?.charAt(0).toUpperCase()}</div>
+              <div style={{ ...s.avatar, background: u.rol === 'revendedor' ? '#4a0080' : '#2a1f00' }}>
+                {u.rol === 'revendedor' ? '🤝' : u.nombre?.charAt(0).toUpperCase()}
+              </div>
               <div style={{ flex: 1 }}>
-                <div style={s.usuarioNombre}>{u.nombre} {!u.activo && <span style={{ fontSize: '11px', color: '#f87171' }}>(Inactivo)</span>}</div>
+                <div style={s.usuarioNombre}>
+                  {u.nombre}
+                  {u.rol === 'revendedor' && <span style={{ fontSize: '10px', background: '#4a0080', color: '#e879f9', padding: '1px 6px', borderRadius: '8px', marginLeft: '6px' }}>Revendedor</span>}
+                  {!u.activo && <span style={{ fontSize: '11px', color: '#f87171', marginLeft: '6px' }}>(Inactivo)</span>}
+                </div>
                 <div style={s.usuarioMeta}>{u.codigo_referido} · {u.email} · {u.celular}</div>
                 {usuarioAbierto === u.id && (
                   <div style={{ marginTop: '10px' }}>
@@ -358,8 +423,8 @@ export default function AdminPanel() {
                       ? <div style={{ fontSize: '12px', color: '#666' }}>No tiene boletas</div>
                       : (boletasUsuario[u.id] || []).map(b => (
                         <div key={b.id} style={{ background: '#0f0f0f', borderRadius: '8px', padding: '10px', marginBottom: '6px' }}>
-                          <div style={{ fontSize: '12px', fontWeight: '600', color: '#D4AF37', marginBottom: '6px' }}>
-                            Boleta #{String(b.id).padStart(3,'0')} · {new Date(b.created_at).toLocaleDateString('es-CO')}
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: '#D4AF37', marginBottom: '4px' }}>
+                            Boleta #{String(b.id).padStart(3,'0')} {b.nombre_cliente ? `· Cliente: ${b.nombre_cliente}` : ''} · {new Date(b.created_at).toLocaleDateString('es-CO')}
                           </div>
                           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                             {b.numeros?.map(n => <span key={n} style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: '4px', padding: '3px 7px', fontSize: '12px', fontWeight: '600', color: '#fff' }}>{n}</span>)}
@@ -386,20 +451,13 @@ export default function AdminPanel() {
         <div>
           <div style={s.card}>
             <div style={s.cardTitle}>➕ Publicar nuevo anuncio</div>
-            <div style={s.field}>
-              <label style={s.fieldLabel}>Título</label>
-              <input style={s.input} placeholder="Ej: Fecha del próximo sorteo" value={nuevoAnuncio.titulo} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, titulo: e.target.value })} />
-            </div>
-            <div style={s.field}>
-              <label style={s.fieldLabel}>Contenido</label>
-              <textarea style={{ ...s.input, minHeight: '80px', resize: 'vertical' }} placeholder="Escribe el mensaje para tus clientes..." value={nuevoAnuncio.contenido} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, contenido: e.target.value })} />
-            </div>
-            <button style={s.btn} onClick={publicarAnuncio}>📢 Publicar anuncio</button>
+            <div style={s.field}><label style={s.fieldLabel}>Título</label><input style={s.input} placeholder="Ej: Fecha del próximo sorteo" value={nuevoAnuncio.titulo} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, titulo: e.target.value })} /></div>
+            <div style={s.field}><label style={s.fieldLabel}>Contenido</label><textarea style={{ ...s.input, minHeight: '80px', resize: 'vertical' }} placeholder="Escribe el mensaje..." value={nuevoAnuncio.contenido} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, contenido: e.target.value })} /></div>
+            <button style={s.btn} onClick={publicarAnuncio}>📢 Publicar</button>
           </div>
-
           <div style={s.card}>
             <div style={s.cardTitle}>📋 Anuncios publicados</div>
-            {anuncios.length === 0 ? <div style={s.empty}>No hay anuncios publicados</div>
+            {anuncios.length === 0 ? <div style={s.empty}>No hay anuncios</div>
               : anuncios.map(a => (
                 <div key={a.id} style={{ ...s.recargaRow, alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
@@ -433,15 +491,13 @@ export default function AdminPanel() {
                   <div>
                     <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>{s2.nombre}</div>
                     <div style={{ fontSize: '12px', color: '#888' }}>
-                      {s2.numero_ganador ? `Número ganador: ` : 'En curso'}
+                      {s2.numero_ganador ? 'Número ganador: ' : 'En curso'}
                       {s2.numero_ganador && <strong style={{ color: '#D4AF37', letterSpacing: '2px' }}>{s2.numero_ganador}</strong>}
                     </div>
                     {s2.jugado_at && <div style={{ fontSize: '11px', color: '#555', marginTop: '3px' }}>{new Date(s2.jugado_at).toLocaleDateString('es-CO')}</div>}
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '11px', background: s2.estado === 'activo' ? '#14532d' : '#1a1a1a', color: s2.estado === 'activo' ? '#4ade80' : '#888', padding: '2px 8px', borderRadius: '10px' }}>
-                      {s2.estado}
-                    </span>
+                    <span style={{ fontSize: '11px', background: s2.estado === 'activo' ? '#14532d' : '#1a1a1a', color: s2.estado === 'activo' ? '#4ade80' : '#888', padding: '2px 8px', borderRadius: '10px' }}>{s2.estado}</span>
                     {s2.saldo_acumulado > 0 && <div style={{ fontSize: '13px', fontWeight: '600', color: '#4ade80', marginTop: '6px' }}>Utilidad: ${s2.saldo_acumulado.toLocaleString('es-CO')}</div>}
                     {s2.estado === 'jugado' && (
                       <button style={{ ...s.btnSecondary, fontSize: '11px', padding: '4px 10px', marginTop: '6px' }} onClick={() => verGanadoresSorteo(s2.id)}>
@@ -484,7 +540,7 @@ export default function AdminPanel() {
                     { label: 'Celular', val: modalUsuario.celular },
                     { label: 'Código', val: modalUsuario.codigo_referido, color: '#D4AF37' },
                     { label: 'Saldo', val: `$${(modalUsuario.saldo || 0).toLocaleString('es-CO')}`, color: '#4ade80' },
-                    { label: 'Estado', val: modalUsuario.activo ? 'Activo' : 'Inactivo', color: modalUsuario.activo ? '#4ade80' : '#f87171' },
+                    { label: 'Rol', val: modalUsuario.rol, color: modalUsuario.rol === 'revendedor' ? '#e879f9' : '#fff' },
                   ].map((item, i) => (
                     <div key={i} style={s.infoItem}>
                       <div style={s.infoLabel}>{item.label}</div>
@@ -549,7 +605,7 @@ const s = {
   badge: { background: '#2a1f00', color: '#D4AF37', fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500' },
   logoutBtn: { fontSize: '12px', color: '#f87171', background: 'none', border: '1px solid #5a0000', borderRadius: '8px', padding: '5px 12px', cursor: 'pointer' },
   tabs: { display: 'flex', gap: '4px', marginBottom: '1.5rem', borderBottom: '1px solid #2a2a2a', flexWrap: 'wrap' },
-  tab: { padding: '8px 12px', fontSize: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#666', borderBottom: '2px solid transparent', marginBottom: '-1px' },
+  tab: { padding: '8px 12px', fontSize: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#666', borderBottom: '2px solid transparent', marginBottom: '-1px', whiteSpace: 'nowrap' },
   tabActive: { color: '#fff', borderBottom: '2px solid #D4AF37', fontWeight: '500' },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '1rem' },
   kpi: { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '14px', textAlign: 'center' },
