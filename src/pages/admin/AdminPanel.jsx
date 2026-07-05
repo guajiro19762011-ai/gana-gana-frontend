@@ -41,6 +41,8 @@ export default function AdminPanel() {
   const [formPagina, setFormPagina] = useState({})
   const [confirmReinicio, setConfirmReinicio] = useState('')
   const [reiniciando, setReiniciando] = useState(false)
+  const [formCred, setFormCred] = useState({ email: '', password_actual: '', password_nuevo: '', confirmar: '' })
+  const [mensajeCred, setMensajeCred] = useState('')
 
   useEffect(() => { cargarDatos() }, [tab])
 
@@ -48,7 +50,7 @@ export default function AdminPanel() {
 
   const cargarDatos = async () => {
     try {
-      const requests = [
+      const [statsRes, recargasRes, usuariosRes, retirosRes, anunciosRes, historialRes, revendedoresRes, mensajesRes, paginaRes] = await Promise.all([
         axios.get(`${API}/admin/stats`, { headers: h() }),
         axios.get(`${API}/admin/recargas`, { headers: h() }),
         axios.get(`${API}/admin/usuarios`, { headers: h() }),
@@ -58,8 +60,7 @@ export default function AdminPanel() {
         axios.get(`${API}/admin/revendedores/solicitudes`, { headers: h() }),
         axios.get(`${API}/mensajes/todos`, { headers: h() }),
         axios.get(`${API}/pagina`),
-      ]
-      const [statsRes, recargasRes, usuariosRes, retirosRes, anunciosRes, historialRes, revendedoresRes, mensajesRes, paginaRes] = await Promise.all(requests)
+      ])
       setStats(statsRes.data)
       setSorteoActivo(statsRes.data.sorteo)
       setRecargas(recargasRes.data)
@@ -73,7 +74,7 @@ export default function AdminPanel() {
       setFormPagina(paginaRes.data)
       const total = historialRes.data.filter(s => s.estado === 'jugado').reduce((acc, s) => acc + (s.saldo_acumulado || 0), 0)
       setSaldoAcumulado(total)
-    } catch (err) { console.error('Error cargando datos:', err) }
+    } catch (err) { console.error('Error:', err) }
   }
 
   const verBoletas = async (usuarioId) => {
@@ -109,7 +110,17 @@ export default function AdminPanel() {
       setRespuesta('')
       abrirChat(usuarioMensaje.id, usuarioMensaje.nombre)
       cargarDatos()
-    } catch (err) { alert('Error al enviar respuesta') }
+    } catch (err) { alert('Error al enviar') }
+  }
+
+  const eliminarConversacion = async (usuarioId) => {
+    if (!confirm('¿Eliminar toda la conversación con este usuario?')) return
+    try {
+      await axios.delete(`${API}/mensajes/usuario/${usuarioId}`, { headers: h() })
+      if (usuarioMensaje?.id === usuarioId) { setUsuarioMensaje(null); setChatMensajes([]) }
+      cargarDatos()
+      alert('✅ Conversación eliminada')
+    } catch (err) { alert('Error al eliminar') }
   }
 
   const abrirModal = (u) => {
@@ -122,23 +133,23 @@ export default function AdminPanel() {
     try {
       await axios.put(`${API}/admin/usuarios/${modalUsuario.id}`, formEdit, { headers: h() })
       cargarDatos(); setModalUsuario(null); alert('✅ Usuario actualizado')
-    } catch (err) { alert('Error al actualizar') }
+    } catch (err) { alert('Error') }
   }
 
   const eliminarUsuario = async (id) => {
     if (!confirm('¿Eliminar este usuario?')) return
     try {
       await axios.delete(`${API}/admin/usuarios/${id}`, { headers: h() })
-      cargarDatos(); setModalUsuario(null); alert('✅ Usuario eliminado')
-    } catch (err) { alert('Error al eliminar') }
+      cargarDatos(); setModalUsuario(null); alert('✅ Eliminado')
+    } catch (err) { alert('Error') }
   }
 
   const recargarUsuario = async () => {
     if (!recargarMonto || Number(recargarMonto) <= 0) return alert('Monto inválido')
     try {
-      await axios.post(`${API}/admin/usuarios/${modalUsuario.id}/recargar`, { monto: Number(recargarMonto), descripcion: recargarDesc || 'Recarga manual por administrador' }, { headers: h() })
-      cargarDatos(); setModalUsuario(null); alert('✅ Saldo recargado')
-    } catch (err) { alert('Error al recargar') }
+      await axios.post(`${API}/admin/usuarios/${modalUsuario.id}/recargar`, { monto: Number(recargarMonto), descripcion: recargarDesc || 'Recarga manual' }, { headers: h() })
+      cargarDatos(); setModalUsuario(null); alert('✅ Recargado')
+    } catch (err) { alert('Error') }
   }
 
   const aprobarRecarga = async (id) => {
@@ -152,17 +163,17 @@ export default function AdminPanel() {
   }
 
   const aprobarRetiro = async (id) => {
-    try { await axios.post(`${API}/retiros/${id}/aprobar`, {}, { headers: h() }); cargarDatos(); alert('✅ Retiro aprobado') }
+    try { await axios.post(`${API}/retiros/${id}/aprobar`, {}, { headers: h() }); cargarDatos(); alert('✅ Aprobado') }
     catch (err) { alert('Error') }
   }
 
   const rechazarRetiro = async (id) => {
-    try { await axios.post(`${API}/retiros/${id}/rechazar`, {}, { headers: h() }); cargarDatos(); alert('✅ Retiro rechazado') }
+    try { await axios.post(`${API}/retiros/${id}/rechazar`, {}, { headers: h() }); cargarDatos(); alert('✅ Rechazado') }
     catch (err) { alert('Error') }
   }
 
   const aprobarRevendedor = async (id, nombre) => {
-    try { await axios.post(`${API}/admin/revendedores/${id}/aprobar`, {}, { headers: h() }); cargarDatos(); alert(`✅ ${nombre} ahora es revendedor`) }
+    try { await axios.post(`${API}/admin/revendedores/${id}/aprobar`, {}, { headers: h() }); cargarDatos(); alert(`✅ ${nombre} es revendedor`) }
     catch (err) { alert('Error') }
   }
 
@@ -172,12 +183,12 @@ export default function AdminPanel() {
   }
 
   const calcularGanadores = async () => {
-    if (!/^\d{4}$/.test(winner)) return alert('Ingresa exactamente 4 dígitos')
+    if (!/^\d{4}$/.test(winner)) return alert('Ingresa 4 dígitos')
     setCargando(true)
     try {
       const { data } = await axios.post(`${API}/admin/sorteo/ganadores`, { numero: winner }, { headers: h() })
       setGanadores(data); setPremiosPagados({})
-    } catch (err) { alert('Error al calcular') }
+    } catch (err) { alert('Error') }
     finally { setCargando(false) }
   }
 
@@ -187,12 +198,12 @@ export default function AdminPanel() {
       await axios.post(`${API}/admin/sorteo/pagar-premio`, { usuario_id: g.usuario_id, premio: g.premio, categoria: g.categoria, numero: g.numero, celular: g.celular }, { headers: h() })
       setPremiosPagados(prev => ({ ...prev, [idx]: true }))
       cargarDatos()
-    } catch (err) { alert('Error al pagar') }
+    } catch (err) { alert('Error') }
   }
 
   const cerrarSorteo = async () => {
-    if (!winner || winner.length !== 4) return alert('Ingresa el número ganador primero')
-    if (!confirm(`¿Cerrar sorteo con ganador ${winner} e iniciar nuevo?`)) return
+    if (!winner || winner.length !== 4) return alert('Ingresa el número ganador')
+    if (!confirm(`¿Cerrar sorteo con ganador ${winner}?`)) return
     setCerrando(true)
     try {
       const { data } = await axios.post(`${API}/admin/sorteo/cerrar`, { numero_ganador: winner }, { headers: h() })
@@ -204,10 +215,10 @@ export default function AdminPanel() {
   }
 
   const publicarAnuncio = async () => {
-    if (!nuevoAnuncio.titulo || !nuevoAnuncio.contenido) return alert('Completa título y contenido')
+    if (!nuevoAnuncio.titulo || !nuevoAnuncio.contenido) return alert('Completa todos los campos')
     try {
       await axios.post(`${API}/anuncios`, nuevoAnuncio, { headers: h() })
-      setNuevoAnuncio({ titulo: '', contenido: '' }); cargarDatos(); alert('✅ Anuncio publicado')
+      setNuevoAnuncio({ titulo: '', contenido: '' }); cargarDatos(); alert('✅ Publicado')
     } catch (err) { alert('Error') }
   }
 
@@ -226,7 +237,7 @@ export default function AdminPanel() {
     try {
       await axios.put(`${API}/pagina`, formPagina, { headers: h() })
       setPagina(formPagina); setEditPagina(false); alert('✅ Página actualizada')
-    } catch (err) { alert('Error al guardar') }
+    } catch (err) { alert('Error') }
   }
 
   const reiniciarSistema = async () => {
@@ -235,18 +246,29 @@ export default function AdminPanel() {
     setReiniciando(true)
     try {
       await axios.post(`${API}/admin/reiniciar`, { confirmacion: 'REINICIAR' }, { headers: h() })
-      alert('✅ Sistema reiniciado. Todo quedó limpio.')
+      alert('✅ Sistema reiniciado.')
       setConfirmReinicio('')
       cargarDatos()
     } catch (err) { alert('Error: ' + (err.response?.data?.error || err.message)) }
     finally { setReiniciando(false) }
   }
 
+  const cambiarCredenciales = async () => {
+    if (!formCred.password_actual) return alert('Ingresa tu contraseña actual')
+    try {
+      const { data } = await axios.put(`${API}/admin/credenciales`, formCred, { headers: h() })
+      setMensajeCred('✅ ' + data.mensaje)
+      setFormCred({ email: '', password_actual: '', password_nuevo: '', confirmar: '' })
+      setTimeout(() => setMensajeCred(''), 5000)
+    } catch (err) {
+      setMensajeCred('❌ ' + (err.response?.data?.error || 'Error'))
+    }
+  }
+
   const recaudoActivo = sorteoActivo ? (sorteoActivo.total_boletas * 5000) : 0
   const premiosPagadosActivo = sorteoActivo?.premios_pagados || 0
   const utilidadActivo = recaudoActivo - premiosPagadosActivo
 
-  // Agrupar mensajes por usuario
   const usuariosMensaje = {}
   mensajes.forEach(m => {
     if (!usuariosMensaje[m.usuario_id]) {
@@ -330,7 +352,7 @@ export default function AdminPanel() {
           <div style={s.cardTitle}>🎯 Número ganador — Sorteo #{String(sorteoActivo?.id || 1).padStart(4,'0')}</div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
             <input style={{ ...s.input, fontSize: '28px', letterSpacing: '8px', textAlign: 'center', maxWidth: '160px' }} value={winner} onChange={e => setWinner(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))} placeholder="0000" maxLength={4} />
-            <button style={{ ...s.btn, opacity: cargando ? 0.7 : 1 }} onClick={calcularGanadores} disabled={cargando}>{cargando ? 'Calculando...' : '🔍 Calcular ganadores'}</button>
+            <button style={{ ...s.btn, opacity: cargando ? 0.7 : 1 }} onClick={calcularGanadores} disabled={cargando}>{cargando ? 'Calculando...' : '🔍 Calcular'}</button>
           </div>
           {ganadores.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
@@ -343,7 +365,7 @@ export default function AdminPanel() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ fontWeight: '600', color: '#D4AF37' }}>${(g.premio).toLocaleString('es-CO')}</div>
-                    {premiosPagados[i] ? <span style={{ fontSize: '12px', color: '#4ade80', fontWeight: '600' }}>✅ Pagado</span>
+                    {premiosPagados[i] ? <span style={{ fontSize: '12px', color: '#4ade80' }}>✅ Pagado</span>
                       : <button style={{ ...s.btn, fontSize: '12px', padding: '6px 12px' }} onClick={() => pagarPremio(g, i)}>💰 Pagar</button>}
                   </div>
                 </div>
@@ -394,7 +416,7 @@ export default function AdminPanel() {
               <span>🤝 Solicitudes ({solicitudesRevendedor.length})</span>
               <button style={s.btnSecondary} onClick={cargarDatos}>🔄</button>
             </div>
-            {solicitudesRevendedor.length === 0 ? <div style={s.empty}>✅ No hay solicitudes pendientes</div>
+            {solicitudesRevendedor.length === 0 ? <div style={s.empty}>✅ No hay solicitudes</div>
               : solicitudesRevendedor.map(u => (
                 <div key={u.id} style={s.recargaRow}>
                   <div><div style={s.recargaNombre}>{u.nombre}</div><div style={s.recargaMeta}>{u.email} · {u.celular} · Saldo: ${(u.saldo||0).toLocaleString('es-CO')}</div></div>
@@ -460,17 +482,20 @@ export default function AdminPanel() {
         <div style={{ display: 'grid', gridTemplateColumns: usuarioMensaje ? '1fr 2fr' : '1fr', gap: '12px' }}>
           <div style={s.card}>
             <div style={{ ...s.cardTitle, display: 'flex', justifyContent: 'space-between' }}>
-             <span>💬 Conversaciones</span>
-             <button style={s.btnSecondary} onClick={cargarDatos}>🔄</button>
+              <span>💬 Conversaciones</span>
+              <button style={s.btnSecondary} onClick={cargarDatos}>🔄</button>
             </div>
-            {Object.keys(usuariosMensaje).length === 0 ? <div style={s.empty}>No hay mensajes aún</div>
+            {Object.keys(usuariosMensaje).length === 0 ? <div style={s.empty}>No hay mensajes</div>
               : Object.values(usuariosMensaje).map(({ usuario: u, ultimoMensaje }) => (
-                <div key={ultimoMensaje.usuario_id} style={{ ...s.usuarioRow, cursor: 'pointer', background: usuarioMensaje?.id === ultimoMensaje.usuario_id ? '#2a2a2a' : '#111' }} onClick={() => abrirChat(ultimoMensaje.usuario_id, u?.nombre)}>
-                  <div style={s.avatar}>{u?.nombre?.charAt(0).toUpperCase()}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={s.usuarioNombre}>{u?.nombre}</div>
-                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>{ultimoMensaje.contenido.slice(0, 40)}...</div>
+                <div key={ultimoMensaje.usuario_id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <div style={{ ...s.usuarioRow, cursor: 'pointer', flex: 1, background: usuarioMensaje?.id === ultimoMensaje.usuario_id ? '#2a2a2a' : '#111', marginBottom: 0 }} onClick={() => abrirChat(ultimoMensaje.usuario_id, u?.nombre)}>
+                    <div style={s.avatar}>{u?.nombre?.charAt(0).toUpperCase()}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={s.usuarioNombre}>{u?.nombre}</div>
+                      <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>{ultimoMensaje.contenido.slice(0, 35)}...</div>
+                    </div>
                   </div>
+                  <button style={{ ...s.btnDanger, fontSize: '11px', padding: '4px 10px', flexShrink: 0 }} onClick={() => eliminarConversacion(ultimoMensaje.usuario_id)}>🗑️</button>
                 </div>
               ))}
           </div>
@@ -478,7 +503,7 @@ export default function AdminPanel() {
           {usuarioMensaje && (
             <div style={s.card}>
               <div style={{ ...s.cardTitle, display: 'flex', justifyContent: 'space-between' }}>
-                <span>💬 Chat con {usuarioMensaje.nombre}</span>
+                <span>💬 {usuarioMensaje.nombre}</span>
                 <button style={s.closeBtn} onClick={() => setUsuarioMensaje(null)}>✕</button>
               </div>
               <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -492,7 +517,7 @@ export default function AdminPanel() {
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input style={{ ...s.input, flex: 1 }} placeholder="Escribe tu respuesta..." value={respuesta} onChange={e => setRespuesta(e.target.value)} onKeyPress={e => e.key === 'Enter' && enviarRespuesta()} />
+                <input style={{ ...s.input, flex: 1 }} placeholder="Responder..." value={respuesta} onChange={e => setRespuesta(e.target.value)} onKeyPress={e => e.key === 'Enter' && enviarRespuesta()} />
                 <button style={s.btn} onClick={enviarRespuesta}>Enviar</button>
               </div>
             </div>
@@ -505,8 +530,8 @@ export default function AdminPanel() {
         <div>
           <div style={s.card}>
             <div style={s.cardTitle}>➕ Nuevo anuncio</div>
-            <div style={s.field}><label style={s.fieldLabel}>Título</label><input style={s.input} placeholder="Título del anuncio" value={nuevoAnuncio.titulo} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, titulo: e.target.value })} /></div>
-            <div style={s.field}><label style={s.fieldLabel}>Contenido</label><textarea style={{ ...s.input, minHeight: '80px', resize: 'vertical' }} placeholder="Mensaje para los clientes..." value={nuevoAnuncio.contenido} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, contenido: e.target.value })} /></div>
+            <div style={s.field}><label style={s.fieldLabel}>Título</label><input style={s.input} placeholder="Título" value={nuevoAnuncio.titulo} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, titulo: e.target.value })} /></div>
+            <div style={s.field}><label style={s.fieldLabel}>Contenido</label><textarea style={{ ...s.input, minHeight: '80px', resize: 'vertical' }} placeholder="Mensaje..." value={nuevoAnuncio.contenido} onChange={e => setNuevoAnuncio({ ...nuevoAnuncio, contenido: e.target.value })} /></div>
             <button style={s.btn} onClick={publicarAnuncio}>📢 Publicar</button>
           </div>
           <div style={s.card}>
@@ -525,7 +550,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* PAGINA QUIENES SOMOS */}
+      {/* PAGINA */}
       {tab === 'pagina' && (
         <div style={s.card}>
           <div style={{ ...s.cardTitle, display: 'flex', justifyContent: 'space-between' }}>
@@ -535,18 +560,12 @@ export default function AdminPanel() {
           {!editPagina ? (
             <div style={{ display: 'grid', gap: '10px' }}>
               {[
-                { label: 'Nombre del negocio', key: 'nombre' },
-                { label: 'Descripción', key: 'descripcion' },
-                { label: 'Misión', key: 'mision' },
-                { label: 'WhatsApp', key: 'contacto_whatsapp' },
-                { label: 'Email', key: 'contacto_email' },
-                { label: 'Instagram', key: 'redes_instagram' },
+                { label: 'Nombre', key: 'nombre' }, { label: 'Descripción', key: 'descripcion' },
+                { label: 'Misión', key: 'mision' }, { label: 'WhatsApp', key: 'contacto_whatsapp' },
+                { label: 'Email', key: 'contacto_email' }, { label: 'Instagram', key: 'redes_instagram' },
                 { label: 'Facebook', key: 'redes_facebook' },
               ].map(f => (
-                <div key={f.key} style={s.infoItem}>
-                  <div style={s.infoLabel}>{f.label}</div>
-                  <div style={s.infoVal}>{pagina[f.key] || <span style={{ color: '#555' }}>Sin definir</span>}</div>
-                </div>
+                <div key={f.key} style={s.infoItem}><div style={s.infoLabel}>{f.label}</div><div style={s.infoVal}>{pagina[f.key] || <span style={{ color: '#555' }}>Sin definir</span>}</div></div>
               ))}
             </div>
           ) : (
@@ -567,7 +586,7 @@ export default function AdminPanel() {
                     : <input style={s.input} type={f.type} value={formPagina[f.key] || ''} onChange={e => setFormPagina({ ...formPagina, [f.key]: e.target.value })} />}
                 </div>
               ))}
-              <button style={s.btn} onClick={guardarPagina}>✅ Guardar cambios</button>
+              <button style={s.btn} onClick={guardarPagina}>✅ Guardar</button>
             </div>
           )}
         </div>
@@ -613,16 +632,25 @@ export default function AdminPanel() {
       {/* SISTEMA */}
       {tab === 'sistema' && (
         <div>
+          <div style={s.card}>
+            <div style={s.cardTitle}>🔐 Cambiar credenciales del admin</div>
+            <div style={s.field}><label style={s.fieldLabel}>Nuevo correo electrónico (opcional)</label><input style={s.input} type="email" placeholder="Nuevo correo" value={formCred.email} onChange={e => setFormCred({ ...formCred, email: e.target.value })} /></div>
+            <div style={s.field}><label style={s.fieldLabel}>Contraseña actual *</label><input style={s.input} type="password" placeholder="Contraseña actual" value={formCred.password_actual} onChange={e => setFormCred({ ...formCred, password_actual: e.target.value })} /></div>
+            <div style={s.field}><label style={s.fieldLabel}>Nueva contraseña (opcional)</label><input style={s.input} type="password" placeholder="Nueva contraseña (mín. 6)" value={formCred.password_nuevo} onChange={e => setFormCred({ ...formCred, password_nuevo: e.target.value })} /></div>
+            <div style={s.field}><label style={s.fieldLabel}>Confirmar nueva contraseña</label><input style={s.input} type="password" placeholder="Repite la nueva contraseña" value={formCred.confirmar} onChange={e => setFormCred({ ...formCred, confirmar: e.target.value })} /></div>
+            {mensajeCred && <div style={{ fontSize: '13px', color: mensajeCred.startsWith('✅') ? '#4ade80' : '#f87171', marginBottom: '10px' }}>{mensajeCred}</div>}
+            <button style={s.btn} onClick={cambiarCredenciales}>🔐 Guardar cambios</button>
+          </div>
+
           <div style={{ ...s.card, borderColor: '#5a0000' }}>
-            <div style={{ ...s.cardTitle, color: '#f87171' }}>⚠️ Zona de peligro</div>
+            <div style={{ ...s.cardTitle, color: '#f87171' }}>⚠️ Zona de peligro — Reiniciar sistema</div>
             <div style={{ fontSize: '13px', color: '#888', marginBottom: '16px', lineHeight: '1.6' }}>
-              El botón de reinicio borrará <strong style={{ color: '#f87171' }}>TODOS</strong> los datos del sistema incluyendo usuarios, boletas, saldos, historial y sorteos. El admin se mantendrá pero con saldo en cero. Se creará un nuevo sorteo limpio.
+              Borrará <strong style={{ color: '#f87171' }}>TODOS</strong> los datos: usuarios, boletas, saldos, historial y sorteos. El admin se mantiene con saldo en cero.
             </div>
             <div style={{ background: '#2a0000', borderRadius: '10px', padding: '16px', border: '1px solid #5a0000' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#f87171', marginBottom: '12px' }}>🔄 Reiniciar sistema completo</div>
               <div style={s.field}>
-                <label style={s.fieldLabel}>Para confirmar escribe: <strong style={{ color: '#f87171' }}>REINICIAR</strong></label>
-                <input style={{ ...s.input, borderColor: '#5a0000' }} placeholder="Escribe REINICIAR" value={confirmReinicio} onChange={e => setConfirmReinicio(e.target.value)} />
+                <label style={s.fieldLabel}>Escribe <strong style={{ color: '#f87171' }}>REINICIAR</strong> para confirmar</label>
+                <input style={{ ...s.input, borderColor: '#5a0000' }} placeholder="REINICIAR" value={confirmReinicio} onChange={e => setConfirmReinicio(e.target.value)} />
               </div>
               <button style={{ ...s.btnDanger, width: '100%', opacity: reiniciando ? 0.7 : 1, fontSize: '14px', padding: '12px' }} onClick={reiniciarSistema} disabled={reiniciando}>
                 {reiniciando ? '⏳ Reiniciando...' : '🗑️ Reiniciar sistema'}
