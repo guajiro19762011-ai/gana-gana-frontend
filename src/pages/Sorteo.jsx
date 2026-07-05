@@ -275,6 +275,7 @@ PREMIOS:
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={s.saldoBadge}>💰 ${saldo.toLocaleString('es-CO')}</div>
           <Link to="/resultados" style={s.linkBtn}>🏆 Resultados</Link>
+          <Link to="/buzon" style={s.linkBtn}>💬 Buzón</Link>
           <button style={s.logoutBtn} onClick={() => { logout(); navigate('/login') }}>Salir</button>
         </div>
       </div>
