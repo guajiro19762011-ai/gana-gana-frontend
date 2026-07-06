@@ -172,39 +172,9 @@ export default function Sorteo() {
     }
   }
 
-  const descargarBoleta = (boleta) => {
-    const nombreMostrar = boleta.nombre_cliente || usuario?.nombre
-    const celularMostrar = boleta.celular_cliente || ''
-    const contenido = `
-GANA GANA O GANA
-================================
-Boleta #${String(boleta.id).padStart(3,'0')}
-Sorteo: ${boleta.sorteos?.nombre}
-Cliente: ${nombreMostrar}
-${celularMostrar ? `Celular: ${celularMostrar}` : ''}
-Fecha: ${new Date(boleta.created_at).toLocaleDateString('es-CO')}
-Valor: $5.000 COP
-================================
-NÚMEROS:
-
-${boleta.numeros?.join('   ')}
-
-================================
-PREMIOS:
-4 cifras exactas → $2.000.000
-3 primeras (123X) → $50.000
-3 últimas (X234) → $50.000
-2 últimas (XX34) → Boleta gratis
-================================
-¡Mucha suerte!
-    `.trim()
-    const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `boleta-${String(boleta.id).padStart(3,'0')}-ganagana.txt`
-    a.click()
-    URL.revokeObjectURL(url)
+  const descargarBoleta = async (boleta) => {
+  const { generarBoletaPNG } = await import('../utils/generarBoleta')
+  await generarBoletaPNG(boleta, usuario, sorteo)
   }
 
   const solicitarRecarga = async () => {
