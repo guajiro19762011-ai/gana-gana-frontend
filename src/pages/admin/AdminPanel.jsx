@@ -38,6 +38,9 @@ export default function AdminPanel() {
   const [respuesta, setRespuesta] = useState('')
   const [pagina, setPagina] = useState({})
   const [editPagina, setEditPagina] = useState(false)
+  const [editPago, setEditPago] = useState(false)
+  const [formPago, setFormPago] = useState({})
+  const [mensajePago, setMensajePago] = useState('')
   const [formPagina, setFormPagina] = useState({})
   const [confirmReinicio, setConfirmReinicio] = useState('')
   const [reiniciando, setReiniciando] = useState(false)
@@ -61,7 +64,7 @@ export default function AdminPanel() {
         axios.get(`${API}/admin/sorteos/historial`, { headers: h() }),
         axios.get(`${API}/admin/revendedores/solicitudes`, { headers: h() }),
         axios.get(`${API}/mensajes/todos`, { headers: h() }),
-        axios.get(`${API}/pagina`),
+        axios.get(`${API}/pagina`).catch(() => ({ data: {} })),
       ])
       setStats(statsRes.data)
       setSorteoActivo(statsRes.data.sorteo)
@@ -74,6 +77,7 @@ export default function AdminPanel() {
       setMensajes(mensajesRes.data)
       setPagina(paginaRes.data)
       setFormPagina(paginaRes.data)
+      setFormPago(paginaRes.data)
       const total = historialRes.data.filter(s => s.estado === 'jugado').reduce((acc, s) => acc + (s.saldo_acumulado || 0), 0)
       setSaldoAcumulado(total)
     } catch (err) { console.error('Error:', err) }
@@ -233,6 +237,20 @@ export default function AdminPanel() {
     if (!confirm('¿Eliminar?')) return
     try { await axios.delete(`${API}/anuncios/${id}`, { headers: h() }); cargarDatos() }
     catch (err) { alert('Error') }
+  }
+
+  const guardarPago = async () => {
+    try {
+      await axios.put(`${API}/pagina`, {
+        pago_nequi: formPago.pago_nequi || '',
+        pago_daviplata: formPago.pago_daviplata || '',
+        pago_usdt: formPago.pago_usdt || '',
+      }, { headers: h() })
+      setPagina({ ...pagina, ...formPago })
+      setEditPago(false)
+      setMensajePago('✅ Datos de pago actualizados')
+      setTimeout(() => setMensajePago(''), 4000)
+    } catch (err) { setMensajePago('❌ Error al guardar') }
   }
 
   const guardarPagina = async () => {
@@ -650,6 +668,28 @@ export default function AdminPanel() {
       {/* SISTEMA */}
       {tab === 'sistema' && (
         <div>
+          <div style={s.card}>
+            <div style={{ ...s.cardTitle, display: 'flex', justifyContent: 'space-between' }}>
+              <span>💳 Datos de pago (Nequi / Daviplata / USDT)</span>
+              <button style={s.btnSecondary} onClick={() => setEditPago(!editPago)}>{editPago ? 'Cancelar' : '✏️ Editar'}</button>
+            </div>
+            {mensajePago && <div style={{ fontSize: '13px', color: mensajePago.startsWith('✅') ? '#4ade80' : '#f87171', marginBottom: '10px' }}>{mensajePago}</div>}
+            {!editPago ? (
+              <div style={{ display: 'grid', gap: '8px' }}>
+                <div style={s.infoItem}><div style={s.infoLabel}>📱 Nequi</div><div style={s.infoVal}>{pagina.pago_nequi || 'Sin configurar'}</div></div>
+                <div style={s.infoItem}><div style={s.infoLabel}>🏦 Daviplata</div><div style={s.infoVal}>{pagina.pago_daviplata || 'Sin configurar'}</div></div>
+                <div style={s.infoItem}><div style={s.infoLabel}>₮ USDT TRC20</div><div style={{ ...s.infoVal, fontSize: '11px', wordBreak: 'break-all' }}>{pagina.pago_usdt || 'Sin configurar'}</div></div>
+              </div>
+            ) : (
+              <div>
+                <div style={s.field}><label style={s.fieldLabel}>📱 Número Nequi</label><input style={s.input} placeholder="Ej: 3001234567" value={formPago.pago_nequi || ''} onChange={e => setFormPago({ ...formPago, pago_nequi: e.target.value })} /></div>
+                <div style={s.field}><label style={s.fieldLabel}>🏦 Número Daviplata</label><input style={s.input} placeholder="Ej: 3001234567" value={formPago.pago_daviplata || ''} onChange={e => setFormPago({ ...formPago, pago_daviplata: e.target.value })} /></div>
+                <div style={s.field}><label style={s.fieldLabel}>₮ Wallet USDT (TRC20)</label><input style={s.input} placeholder="Ej: TXxxxxxxxxxxxxxxxxxxxxxx" value={formPago.pago_usdt || ''} onChange={e => setFormPago({ ...formPago, pago_usdt: e.target.value })} /></div>
+                <button style={{ ...s.btn, width: '100%' }} onClick={guardarPago}>✅ Guardar datos de pago</button>
+              </div>
+            )}
+          </div>
+
           <div style={s.card}>
             <div style={s.cardTitle}>🎲 Generar boletas del sorteo activo</div>
             <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px', lineHeight: '1.6' }}>

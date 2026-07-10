@@ -36,6 +36,7 @@ export default function Sorteo() {
   const [mensajeRetiro, setMensajeRetiro] = useState('')
   const [misRetiros, setMisRetiros] = useState([])
   const [anuncios, setAnuncios] = useState([])
+  const [datosPago, setDatosPago] = useState({})
   const intervalRef = useRef(null)
 
   const headers = { Authorization: `Bearer ${token}` }
@@ -79,12 +80,20 @@ export default function Sorteo() {
     } catch (err) { console.error(err) }
   }, [token])
 
+  const cargarDatosPago = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/pagina`)
+      setDatosPago(data)
+    } catch (err) { console.error(err) }
+  }, [])
+
   useEffect(() => {
     cargarSorteo()
     cargarBilletera()
     cargarMisBoletas()
     cargarAnuncios()
     cargarMisRetiros()
+    cargarDatosPago()
     intervalRef.current = setInterval(cargarSorteo, 10000)
     return () => clearInterval(intervalRef.current)
   }, [])
@@ -190,9 +199,9 @@ export default function Sorteo() {
   const pct = ((vendidas / 1000) * 100).toFixed(1)
   const esRevendedor = rolUsuario === 'revendedor'
   const metodos = [
-    { id: 'nequi', emoji: '📱', label: 'Nequi', info: 'Transfiere a: 300 000 0000' },
-    { id: 'daviplata', emoji: '🏦', label: 'Daviplata', info: 'Transfiere a: 300 000 0001' },
-    { id: 'usdt', emoji: '₮', label: 'USDT', info: 'Red TRC20: TXxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
+    { id: 'nequi', emoji: '📱', label: 'Nequi', info: `Nequi: ${datosPago.pago_nequi || '300 000 0000'}` },
+    { id: 'daviplata', emoji: '🏦', label: 'Daviplata', info: `Daviplata: ${datosPago.pago_daviplata || '300 000 0001'}` },
+    { id: 'usdt', emoji: '₮', label: 'USDT', info: `USDT TRC20: ${datosPago.pago_usdt || 'TXxxxxxxxxxxxxxxxxxxxxxxxxxxx'}` },
   ]
 
   return (
