@@ -255,6 +255,22 @@ export default function AdminPanel() {
     finally { setReiniciando(false) }
   }
 
+  const generarBoletasFn = async () => {
+    if (!confirm('¿Generar 1.000 boletas para el sorteo activo?')) return
+    setGenerando(true)
+    setMensajeGenerar('')
+    try {
+      const { data } = await axios.post(`${API}/admin/sorteo/generar-boletas`,
+        { sorteo_id: sorteoActivo?.id },
+        { headers: h() }
+      )
+      setMensajeGenerar(`✅ ${data.total} boletas generadas exitosamente`)
+      cargarDatos()
+    } catch (err) {
+      setMensajeGenerar('❌ ' + (err.response?.data?.error || 'Error al generar'))
+    } finally { setGenerando(false) }
+  }
+
   const cambiarCredenciales = async () => {
     if (!formCred.password_actual) return alert('Ingresa tu contraseña actual')
     try {
@@ -280,22 +296,7 @@ export default function AdminPanel() {
     if (new Date(m.created_at) > new Date(usuariosMensaje[m.usuario_id].ultimoMensaje.created_at)) {
       usuariosMensaje[m.usuario_id].ultimoMensaje = m
     }
-  const generarBoletasFn = async () => {
-  if (!confirm('¿Generar 1.000 boletas para el sorteo activo?')) return
-  setGenerando(true)
-  setMensajeGenerar('')
-  try {
-    const { data } = await axios.post(`${API}/admin/sorteo/generar-boletas`,
-      { sorteo_id: sorteoActivo?.id },
-      { headers: h() }
-    )
-    setMensajeGenerar(`✅ ${data.total} boletas generadas exitosamente`)
-    cargarDatos()
-  } catch (err) {
-    setMensajeGenerar('❌ ' + (err.response?.data?.error || 'Error al generar'))
-  } finally { setGenerando(false) }
-  }
-  })  
+  })
 
   return (
     <div style={s.container}>
@@ -650,21 +651,21 @@ export default function AdminPanel() {
       {tab === 'sistema' && (
         <div>
           <div style={s.card}>
-            <div style={s.card}>
             <div style={s.cardTitle}>🎲 Generar boletas del sorteo activo</div>
             <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px', lineHeight: '1.6' }}>
-              Genera las 1.000 boletas pre-distribuidas para el sorteo actual.
-              Úsalo al iniciar un nuevo sorteo o después de reiniciar el sistema.
+              Genera las 1.000 boletas pre-distribuidas para el sorteo actual. Úsalo al iniciar un nuevo sorteo o después de reiniciar el sistema.
             </div>
-          {mensajeGenerar && (
-            <div style={{ fontSize: '13px', color: mensajeGenerar.startsWith('✅') ? '#4ade80' : '#f87171', marginBottom: '10px' }}>
-            {mensajeGenerar}
-            </div>
-          )}
-          <button style={{ ...s.btn, width: '100%', opacity: generando ? 0.7 : 1 }} onClick={generarBoletasFn} disabled={generando}>
-           {generando ? '⏳ Generando 1.000 boletas...' : '🎲 Generar boletas'}
-          </button>
-        </div>
+            {mensajeGenerar && (
+              <div style={{ fontSize: '13px', color: mensajeGenerar.startsWith('✅') ? '#4ade80' : '#f87171', marginBottom: '10px' }}>
+                {mensajeGenerar}
+              </div>
+            )}
+            <button style={{ ...s.btn, width: '100%', opacity: generando ? 0.7 : 1 }} onClick={generarBoletasFn} disabled={generando}>
+              {generando ? '⏳ Generando 1.000 boletas...' : '🎲 Generar boletas'}
+            </button>
+          </div>
+
+          <div style={s.card}>
             <div style={s.cardTitle}>🔐 Cambiar credenciales del admin</div>
             <div style={s.field}><label style={s.fieldLabel}>Nuevo correo electrónico (opcional)</label><input style={s.input} type="email" placeholder="Nuevo correo" value={formCred.email} onChange={e => setFormCred({ ...formCred, email: e.target.value })} /></div>
             <div style={s.field}><label style={s.fieldLabel}>Contraseña actual *</label><input style={s.input} type="password" placeholder="Contraseña actual" value={formCred.password_actual} onChange={e => setFormCred({ ...formCred, password_actual: e.target.value })} /></div>
