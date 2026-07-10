@@ -37,6 +37,8 @@ export default function Sorteo() {
   const [misRetiros, setMisRetiros] = useState([])
   const [anuncios, setAnuncios] = useState([])
   const [datosPago, setDatosPago] = useState({})
+  const [boletasGratis, setBoletasGratis] = useState([])
+  const [reclamando, setReclamando] = useState(false)
   const intervalRef = useRef(null)
 
   const headers = { Authorization: `Bearer ${token}` }
@@ -80,6 +82,13 @@ export default function Sorteo() {
     } catch (err) { console.error(err) }
   }, [token])
 
+  const cargarBoletasGratis = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/sorteos/boleta-gratis`, { headers })
+      setBoletasGratis(data)
+    } catch (err) { console.error(err) }
+  }, [token])
+
   const cargarDatosPago = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API}/pagina`)
@@ -94,6 +103,7 @@ export default function Sorteo() {
     cargarAnuncios()
     cargarMisRetiros()
     cargarDatosPago()
+    cargarBoletasGratis()
     intervalRef.current = setInterval(cargarSorteo, 10000)
     return () => clearInterval(intervalRef.current)
   }, [])
@@ -147,6 +157,26 @@ export default function Sorteo() {
     } catch (err) {
       alert(err.response?.data?.error || 'Error al procesar')
     } finally { setComprando(false) }
+  }
+
+  const reclamarBoletaGratis = async (boletaGratisId) => {
+    setReclamando(true)
+    try {
+      // Primero tomar una boleta aleatoria
+      const { data: aleatoria } = await axios.get(`${API}/sorteos/aleatoria`, { headers })
+      if (!aleatoria?.boleta) return alert('No hay boletas disponibles')
+      
+      const { data } = await axios.post(`${API}/sorteos/reclamar-boleta-gratis`, {
+        boleta_gratis_id: boletaGratisId,
+        boleta_id: aleatoria.boleta.id
+      }, { headers })
+      
+      setBoletasGratis(prev => prev.filter(b => b.id !== boletaGratisId))
+      cargarMisBoletas()
+      alert('✅ ¡Boleta gratis reclamada! Ya aparece en tus boletas.')
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al reclamar')
+    } finally { setReclamando(false) }
   }
 
   const descargarBoleta = async (boleta) => {
@@ -337,6 +367,28 @@ export default function Sorteo() {
               </div>
             )}
           </div>
+
+          {/* BOLETAS GRATIS PENDIENTES */}
+          {boletasGratis.length > 0 && (
+            <div style={{ background: '#0a1a0a', border: '1px solid #22c55e40', borderRadius: '14px', padding: '16px', marginTop: '12px' }}>
+              <div style={{ fontWeight: '600', fontSize: '14px', color: '#22c55e', marginBottom: '10px' }}>🎟️ Tienes {boletasGratis.length} boleta(s) gratis pendiente(s)</div>
+              <div style={{ fontSize: '13px', color: '#888', marginBottom: '14px' }}>
+                Ganaste una boleta gratis por acertar las 2 últimas cifras del sorteo anterior. ¡Reclámala ahora!
+              </div>
+              {boletasGratis.map(bg => (
+                <div key={bg.id} style={{ background: '#111', borderRadius: '10px', padding: '12px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600' }}>Boleta gratis</div>
+                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>Número ganador: <strong style={{ color: '#22c55e' }}>{bg.numero_ganador}</strong></div>
+                  </div>
+                  <button style={{ background: '#22c55e', color: '#000', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: reclamando ? 0.7 : 1 }}
+                    onClick={() => reclamarBoletaGratis(bg.id)} disabled={reclamando}>
+                    {reclamando ? '...' : '🎟️ Reclamar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

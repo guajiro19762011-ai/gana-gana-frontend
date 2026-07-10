@@ -273,6 +273,15 @@ export default function AdminPanel() {
     finally { setReiniciando(false) }
   }
 
+  const otorgarBoletaGratis = async (g) => {
+    if (!confirm(`¿Otorgar boleta gratis a ${g.nombre}?`)) return
+    try {
+      await axios.post(`${API}/admin/sorteo/otorgar-boleta-gratis`, { usuario_id: g.usuario_id, numero: g.numero }, { headers: h() })
+      setPremiosPagados(prev => ({ ...prev, [`gratis_${g.numero}_${g.usuario_id}`]: true }))
+      alert(`✅ Boleta gratis otorgada a ${g.nombre}. Ya puede reclamarla desde su panel.`)
+    } catch (err) { alert('Error: ' + (err.response?.data?.error || err.message)) }
+  }
+
   const generarBoletasFn = async () => {
     if (!confirm('¿Generar 1.000 boletas para el sorteo activo?')) return
     setGenerando(true)
@@ -400,9 +409,18 @@ export default function AdminPanel() {
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{g.nombre} · {g.email}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ fontWeight: '600', color: '#D4AF37' }}>${(g.premio).toLocaleString('es-CO')}</div>
-                    {premiosPagados[i] ? <span style={{ fontSize: '12px', color: '#4ade80' }}>✅ Pagado</span>
-                      : <button style={{ ...s.btn, fontSize: '12px', padding: '6px 12px' }} onClick={() => pagarPremio(g, i)}>💰 Pagar</button>}
+                    <div style={{ fontWeight: '600', color: g.esBoleta ? '#22c55e' : '#D4AF37' }}>
+                      {g.esBoleta ? '🎟️ Boleta gratis' : `$${(g.premio).toLocaleString('es-CO')}`}
+                    </div>
+                    {g.esBoleta ? (
+                      premiosPagados[`gratis_${g.numero}_${g.usuario_id}`]
+                        ? <span style={{ fontSize: '12px', color: '#22c55e' }}>✅ Otorgada</span>
+                        : <button style={{ ...s.btn, fontSize: '12px', padding: '6px 12px', background: '#22c55e', color: '#000' }} onClick={() => otorgarBoletaGratis(g)}>🎟️ Otorgar</button>
+                    ) : (
+                      premiosPagados[i]
+                        ? <span style={{ fontSize: '12px', color: '#4ade80' }}>✅ Pagado</span>
+                        : <button style={{ ...s.btn, fontSize: '12px', padding: '6px 12px' }} onClick={() => pagarPremio(g, i)}>💰 Pagar</button>
+                    )}
                   </div>
                 </div>
               ))}
