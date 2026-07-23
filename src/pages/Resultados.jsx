@@ -74,7 +74,7 @@ export default function Resultados() {
       <div style={s.header}>
         <div style={s.logo}>🏆 <span style={s.gold}>Resultados</span></div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <Link to="/" style={s.linkBtn}>🏠 Inicio</Link>
+          <Link to="/sorteo" style={s.linkBtn}>🎲 Volver al sorteo</Link>
           <Link to="/login" style={s.btnPrimary}>Entrar</Link>
         </div>
       </div>
