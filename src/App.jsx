@@ -9,7 +9,13 @@ import QuienesSomos from './pages/QuienesSomos'
 import Buzon from './pages/Buzon'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminPanel from './pages/admin/AdminPanel'
-
+// Mantener el backend despierto
+const BACKEND = import.meta.env.VITE_API_URL?.replace('/api', '')
+if (BACKEND) {
+  setInterval(() => {
+    fetch(`${BACKEND}/health`).catch(() => {})
+  }, 14 * 60 * 1000) // cada 14 minutos
+}
 export default function App() {
   return (
     <AuthProvider>
