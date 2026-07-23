@@ -673,7 +673,7 @@ export default function AdminPanel() {
                       : (boletasUsuario[`sorteo_${s2.id}`] || []).map((g, i) => (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #2a2a2a', fontSize: '12px' }}>
                           <div><span style={{ ...s.badge, background: categoriaBadge(g.categoria), fontSize: '10px' }}>{g.categoria}</span> <strong style={{ marginLeft: '6px' }}>{g.numero}</strong> · {g.usuarios?.nombre}</div>
-                          <div style={{ color: '#D4AF37', fontWeight: '600' }}>${g.premio.toLocaleString('es-CO')}</div>
+                          <div style={{ color: g.categoria === '2 Últimas' ? '#22c55e' : '#D4AF37', fontWeight: '600' }}>{g.categoria === '2 Últimas' ? '🎟️ Boleta gratis' : `$${g.premio.toLocaleString('es-CO')}`}</div>
                         </div>
                       ))}
                   </div>
