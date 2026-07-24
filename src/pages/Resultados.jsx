@@ -12,6 +12,10 @@ export default function Resultados() {
   const [cargandoGanadores, setCargandoGanadores] = useState(false)
 
   useEffect(() => {
+    // Despertar el backend
+    const backendUrl = API?.replace('/api', '')
+    if (backendUrl) fetch(`${backendUrl}/health`).catch(() => {})
+
     const cargar = async () => {
       try {
         const { data } = await axios.get(`${API}/sorteos/historial-publico`)
@@ -86,9 +90,7 @@ export default function Resultados() {
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎲</div>
           <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>Aún no hay resultados</div>
           <div style={{ fontSize: '14px', color: '#666' }}>El primer sorteo está en curso. ¡Compra tu boleta y participa!</div>
-          <Link to="/sorteo" style={{ ...s.btnPrimary, display: 'inline-block', marginTop: '20px', textDecoration: 'none' }}>
-            🎟️ Comprar boleta
-          </Link>
+
         </div>
       ) : (
         <div>
@@ -177,9 +179,7 @@ export default function Resultados() {
             </div>
           )}
 
-          <Link to="/sorteo" style={{ ...s.btnPrimary, display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '16px', padding: '14px' }}>
-            🎟️ Participar en el próximo sorteo
-          </Link>
+
         </div>
       )}
     </div>
