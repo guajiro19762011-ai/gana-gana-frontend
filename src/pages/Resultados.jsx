@@ -75,7 +75,7 @@ export default function Resultados() {
         <div style={s.logo}>🏆 <span style={s.gold}>Resultados</span></div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <Link to="/sorteo" style={s.linkBtn}>🎲 Volver al sorteo</Link>
-          <Link to="/login" style={s.btnPrimary}>Entrar</Link>
+          <Link to="/sorteo" style={s.btnPrimary}>🎲 Al sorteo</Link>
         </div>
       </div>
 
@@ -86,7 +86,7 @@ export default function Resultados() {
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎲</div>
           <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>Aún no hay resultados</div>
           <div style={{ fontSize: '14px', color: '#666' }}>El primer sorteo está en curso. ¡Compra tu boleta y participa!</div>
-          <Link to="/login" style={{ ...s.btnPrimary, display: 'inline-block', marginTop: '20px', textDecoration: 'none' }}>
+          <Link to="/sorteo" style={{ ...s.btnPrimary, display: 'inline-block', marginTop: '20px', textDecoration: 'none' }}>
             🎟️ Comprar boleta
           </Link>
         </div>
@@ -177,7 +177,7 @@ export default function Resultados() {
             </div>
           )}
 
-          <Link to="/login" style={{ ...s.btnPrimary, display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '16px', padding: '14px' }}>
+          <Link to="/sorteo" style={{ ...s.btnPrimary, display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '16px', padding: '14px' }}>
             🎟️ Participar en el próximo sorteo
           </Link>
         </div>
